@@ -1,57 +1,23 @@
-# Warehouse Order Picking - Uncertainty Quantification & Reliability Analysis
+# Warehouse UQ Analysis
 
-**MSc-level project analyzing warehouse order picking performance under uncertainty**
+My MSc project on uncertainty quantification for warehouse order picking. Basically trying to answer: how likely are we to miss the SLA?
 
-[![License](https://img.shields.io/badge/License-Academic-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.7+-green.svg)](https://python.org)
-[![LaTeX](https://img.shields.io/badge/LaTeX-Document-orange.svg)](warehouse_report/main.pdf)
+## What is this?
 
-## Overview
+Applied UQ and reliability methods to warehouse picking. Used FOSM, Monte Carlo (100k samples), and FORM to analyze failure probability.
 
-This project applies advanced **Uncertainty Quantification (UQ)** and **Reliability Analysis** methods to assess warehouse order picking performance. We answer the critical question: *"What's the probability we'll miss our Service Level Agreement (SLA)?"*
+**Bottom line:** ~7.3% chance of missing the 20-min SLA. Order size and picking time per item are what really matter.
 
-### Key Results
+## What's in here
 
-- **Failure Probability**: ~7.3% (orders exceeding 20-minute SLA)
-- **Reliability Index (β)**: 1.44
-- **Critical Factors**: 
-  - Order lines: 51% contribution to failure
-  - Picking time per line: 41% contribution
+- LaTeX report (21 pages) - compile with `pdflatex main.tex`
+- Python simulation - runs all the analysis
+- Visualizations - tornado diagram, distributions, FORM plots
+- Data exports - CSV files with results
 
-## What's Included
+## Running it
 
-### 📄 Documentation
-- **[main.pdf](warehouse_report/main.pdf)** - Complete 21-page technical report
-- **[ENHANCED_PROJECT_SUMMARY.md](ENHANCED_PROJECT_SUMMARY.md)** - Quick project overview
-- **[PYTHON_README.md](warehouse_report/PYTHON_README.md)** - Python implementation guide
-
-### 🐍 Python Simulation
-- **Monte Carlo Simulation** (100,000 samples)
-- **FOSM** (First-Order Second-Moment) method
-- **FORM** (First-Order Reliability Method)
-- **Sensitivity Analysis**
-- Professional visualizations (300 DPI)
-
-### 📊 Visualizations
-- 9-panel comprehensive UQ analysis
-- Tornado diagram (sensitivity ranking)
-- Distribution comparisons (PDF & CDF)
-- FORM analysis in standard normal space
-
-### 📚 Course Materials
-- Full set of UQ lecture notes (UQGdansk series)
-- Assignment descriptions
-- Fundamentals summary
-
-## Quick Start
-
-### View the Report
-```bash
-cd warehouse_report
-evince main.pdf  # or your preferred PDF viewer
-```
-
-### Run the Simulation
+### Simulation
 ```bash
 cd warehouse_report
 python3 -m venv venv
@@ -60,30 +26,23 @@ pip install -r requirements.txt
 python uq_simulation.py
 ```
 
-**Runtime**: ~30-60 seconds (100k MC samples)
+Takes about 30-60 sec to run 100k Monte Carlo samples.
 
-### Recompile the Document
+### LaTeX doc
 ```bash
 cd warehouse_report
 pdflatex main.tex
 pdflatex main.tex  # Run twice for references
 ```
 
-## Project Structure
+## Structure
 
 ```
-UQ/
-├── warehouse_report/          # Main project directory
-│   ├── main.tex              # LaTeX source (21 pages)
-│   ├── main.pdf              # ✨ Final PDF report
-│   ├── uq_simulation.py      # Python implementation
-│   ├── requirements.txt      # Dependencies
-│   ├── *.png                 # Visualizations (4 figures)
-│   └── *.csv                 # Results data
-│
-├── *.pdf                     # Course materials
-├── ENHANCED_PROJECT_SUMMARY.md
-└── README.md                 # This file
+warehouse_report/
+├── main.tex              # LaTeX source
+├── uq_simulation.py      # Python code
+├── *.png                 # Figures
+└── *.csv                 # Results
 ```
 
 ## Methodology

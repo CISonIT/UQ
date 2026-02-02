@@ -463,16 +463,16 @@ $t_w$ & 0.28 & 0.08 \\
 
 \subsection{Python-Based Simulation Framework}
 
-To support the theoretical analysis and provide a practical implementation framework, a comprehensive Python simulation tool has been developed. The implementation encompasses all analytical methods described in this report, including FOSM, Monte Carlo simulation, and FORM analysis \cite{mckinney2010, oliphant2007}. The code is structured into modular components for clarity and maintainability, following software engineering best practices for scientific computing \cite{wilson2014}.
+To support the theoretical analysis and provide a practical implementation framework, a comprehensive Python simulation tool has been developed. The implementation encompasses all analytical methods described in this report, including FOSM, Monte Carlo simulation, and FORM analysis. The code is structured into modular components for clarity and maintainability.
 
 \textbf{Implementation Architecture:} The simulation framework consists of the following components:
 \begin{itemize}
 \item \textbf{Model Definition Module:} Encapsulates the warehouse picking model, including parameter specifications, distribution definitions, and model evaluation functions.
-\item \textbf{Random Variable Generation:} Implements efficient sampling from normal and lognormal distributions using NumPy's vectorized operations \cite{oliphant2007}, with parameter transformations for lognormal variables.
+\item \textbf{Random Variable Generation:} Implements efficient sampling from normal and lognormal distributions using NumPy's vectorized operations, with parameter transformations for lognormal variables.
 \item \textbf{FOSM Analysis Engine:} Computes gradients using analytical expressions and evaluates variance propagation via matrix operations.
 \item \textbf{Monte Carlo Simulator:} Generates $N_{\text{MC}} = 10^5$ samples with statistical analysis including confidence intervals, percentiles, and convergence diagnostics.
 \item \textbf{FORM Optimization:} Implements the Hasofer-Lind-Rackwitz-Fiessler (HLRF) algorithm with automatic transformation to standard normal space and iterative search for the most probable point.
-\item \textbf{Visualization Suite:} Produces publication-quality figures (300 DPI) using Matplotlib and Seaborn \cite{hunter2007, waskom2021}.
+\item \textbf{Visualization Suite:} Produces publication-quality figures (300 DPI) using standard Python visualization libraries.
 \end{itemize}
 
 \textbf{Computational Performance:} The complete analysis, including 100,000 Monte Carlo samples and FORM optimization, executes in approximately 30--60 seconds on standard hardware (Intel Core i5 or equivalent), demonstrating the computational efficiency of the approach.
@@ -674,26 +674,8 @@ Baker, J. W., \& Cornell, C. A. (2003). \textit{Uncertainty Specification and Pr
 \bibitem{low2007}
 Low, B. K., \& Tang, W. H. (2007). Efficient spreadsheet algorithm for first-order reliability method. \textit{Journal of Engineering Mechanics}, 133(12), 1378--1387.
 
-\bibitem{mckinney2010}
-McKinney, W. (2010). Data structures for statistical computing in Python. In S. van der Walt \& J. Millman (Eds.), \textit{Proceedings of the 9th Python in Science Conference} (pp. 56--61).
-
-\bibitem{oliphant2007}
-Oliphant, T. E. (2007). Python for scientific computing. \textit{Computing in Science \& Engineering}, 9(3), 10--20.
-
-\bibitem{hunter2007}
-Hunter, J. D. (2007). Matplotlib: A 2D graphics environment. \textit{Computing in Science \& Engineering}, 9(3), 90--95.
-
-\bibitem{waskom2021}
-Waskom, M. L. (2021). Seaborn: Statistical data visualization. \textit{Journal of Open Source Software}, 6(60), 3021.
-
-\bibitem{wilson2014}
-Wilson, G., Aruliah, D. A., Brown, C. T., Chue Hong, N. P., Davis, M., Guy, R. T., ... \& Wilson, P. (2014). Best practices for scientific computing. \textit{PLOS Biology}, 12(1), e1001745.
-
 \bibitem{melchers1999}
 Melchers, R. E. (1999). \textit{Structural Reliability Analysis and Prediction} (2nd ed.). John Wiley \& Sons.
-
-\bibitem{phoon1999}
-Phoon, K. K., \& Kulhawy, F. H. (1999). Characterization of geotechnical variability. \textit{Canadian Geotechnical Journal}, 36(4), 612--624.
 
 \bibitem{au2010}
 Au, S. K., Cao, Z. J., \& Wang, Y. (2010). Implementing advanced Monte Carlo simulation under spreadsheet environment. \textit{Structural Safety}, 32(5), 281--292.

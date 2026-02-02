@@ -36,6 +36,9 @@ Thumbs.db
 # Data files (too large)
 warehouse_report/mc_samples.csv
 
+# PDFs (too large for git)
+*.pdf
+
 # Keep the visualizations and smaller CSVs
 !warehouse_report/*.png
 !warehouse_report/summary_results.csv
