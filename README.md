@@ -1,135 +1,77 @@
 # Warehouse UQ Analysis
 
-My MSc project on uncertainty quantification for warehouse order picking. Basically trying to answer: how likely are we to miss the SLA?
+MSc project - uncertainty quantification for warehouse order picking. Analyzes how likely we are to miss the 20-min SLA.
 
-## What is this?
+**Result:** ~7.3% failure probability. Order size and picking time are the main factors.
 
-Applied UQ and reliability methods to warehouse picking. Used FOSM, Monte Carlo (100k samples), and FORM to analyze failure probability.
+## Quick Start
 
-**Bottom line:** ~7.3% chance of missing the 20-min SLA. Order size and picking time per item are what really matter.
-
-## What's in here
-
-- LaTeX report (21 pages) - compile with `pdflatex main.tex`
-- Python simulation - runs all the analysis
-- Visualizations - tornado diagram, distributions, FORM plots
-- Data exports - CSV files with results
-
-## Running it
-
-### Simulation
+### Run the simulation
 ```bash
 cd warehouse_report
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python uq_simulation.py
+python3 uq_simulation.py
 ```
 
-Takes about 30-60 sec to run 100k Monte Carlo samples.
+That's it. Script will:
+1. Install dependencies automatically if needed
+2. Run Monte Carlo (100k samples, ~30-60 sec)
+3. Generate 4 figures (PNG)
+4. Export results to CSV
+5. Print summary to terminal
 
-### LaTeX doc
+### Generate PDF report
 ```bash
 cd warehouse_report
 pdflatex main.tex
-pdflatex main.tex  # Run twice for references
+pdflatex main.tex
 ```
 
-## Structure
+Produces 21-page report with all analysis.
 
+## What's included
+
+- **Python simulation** - FOSM, Monte Carlo, FORM methods
+- **LaTeX report** - Full writeup with 33 references
+- **Visualizations** - Tornado diagram, distributions, FORM plots
+- **Data** - CSV exports of all results
+
+## Model
+
+Simple linear model:
 ```
-warehouse_report/
-├── main.tex              # LaTeX source
-├── uq_simulation.py      # Python code
-├── *.png                 # Figures
-└── *.csv                 # Results
+Picking Time = (# items × time per item) + (distance × walking speed)
 ```
 
-## Methodology
+Inputs are random variables (Normal/Lognormal). SLA threshold = 20 minutes.
 
-### Mathematical Model
-```
-Y = N × t_p + D × t_w
-```
+## Methods
 
-Where:
-- **N**: Number of order lines (Normal, μ=20, CoV=0.20)
-- **t_p**: Picking time per line (Lognormal, μ=30s, CoV=0.15)
-- **D**: Walking distance (Normal, μ=300m, CoV=0.10)
-- **t_w**: Walking time per meter (Lognormal, μ=1.2 s/m, CoV=0.10)
+- **FOSM** - Analytical approximation
+- **Monte Carlo** - 100k samples
+- **FORM** - Most probable failure point
+- **Sensitivity** - Which variables matter most
 
-**SLA Threshold**: 1200 seconds (20 minutes)
+## Results
 
-### Analysis Methods
+| Method | P_f | β |
+|--------|-----|---|
+| Monte Carlo | 7.3% | 1.46 |
+| FORM | 7.5% | 1.44 |
 
-1. **FOSM**: Fast analytical approximation
-2. **Monte Carlo**: Brute-force sampling (100k samples)
-3. **FORM**: Find most probable failure point
-4. **Sensitivity**: Identify critical variables
-
-## Academic Context
-
-**Suitable for:**
-- ✅ MSc Industrial Engineering coursework
-- ✅ Production Management courses
-- ✅ Reliability Analysis courses
-- ✅ Operations Research applications
-- ✅ Portfolio demonstrations
-
-**Features:**
-- 40 peer-reviewed references (EJOR, IJPR, Structural Safety)
-- Proper mathematical formulations
-- Professional visualizations
-- Complete reproducibility
+Variables ranked by impact:
+1. Order size (51%)
+2. Picking time (41%)
+3. Walking distance (4%)
+4. Walking speed (4%)
 
 ## Dependencies
 
-### Python
-- numpy >= 1.21.0
-- matplotlib >= 3.4.0
-- scipy >= 1.7.0
-- pandas >= 1.3.0
-- seaborn >= 0.11.0
+Python packages (auto-installed):
+- numpy, scipy, matplotlib, pandas, seaborn
 
-### LaTeX
-- pdflatex (TeX Live, MiKTeX, or MacTeX)
-- Standard packages (amsmath, hyperref, graphicx, etc.)
-
-## Results Summary
-
-| Method | Mean [s] | Std Dev [s] | P_f [%] | β |
-|--------|----------|-------------|---------|---|
-| FOSM | 960 | 158 | - | 1.77 |
-| Monte Carlo | 960 | 159 | 7.26 | 1.46 |
-| FORM | - | - | 7.51 | 1.44 |
-
-## Managerial Insights
-
-**Where to focus improvements:**
-1. **Order batching** - Reduce variability in order sizes
-2. **Picking standardization** - Voice-directed or light-guided systems
-3. **Ergonomics & training** - Improve picker consistency
-
-**Lower priority:**
-- Walking distance optimization (only 3.7% impact)
-- Walking speed improvements (only 3.9% impact)
-
-## Author
-
-**Jakub** - MSc Student  
-*Industrial Engineering / Production Management*
-
-## License
-
-Academic use only. Please cite appropriately if used in coursework or research.
-
-## Acknowledgments
-
-- Course materials from UQ Gdansk series
-- Python scientific computing stack (NumPy, SciPy, Matplotlib)
-- LaTeX community
+LaTeX (for PDF):
+- pdflatex with standard packages
 
 ---
 
-**Last Updated**: February 2026  
-**Status**: ✅ Complete & Production-Ready
+**Jakub** | MSc Industrial Engineering | Feb 2026

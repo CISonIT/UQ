@@ -15,13 +15,27 @@ Author: Jakub
 Date: February 2026
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy import stats
-from scipy.optimize import minimize
-import pandas as pd
-import seaborn as sns
-from matplotlib.patches import Rectangle
+# Check dependencies
+try:
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from scipy import stats
+    from scipy.optimize import minimize
+    import pandas as pd
+    import seaborn as sns
+    from matplotlib.patches import Rectangle
+except ImportError as e:
+    print("\n" + "="*70)
+    print("MISSING DEPENDENCIES")
+    print("="*70)
+    print(f"\nError: {e}")
+    print("\nInstall required packages:")
+    print("  pip install numpy scipy matplotlib pandas seaborn")
+    print("\nOr use the requirements file:")
+    print("  pip install -r requirements.txt")
+    print("\n" + "="*70 + "\n")
+    exit(1)
+
 import warnings
 warnings.filterwarnings('ignore')
 
