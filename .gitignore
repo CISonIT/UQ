@@ -1,0 +1,42 @@
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.blg
+*.bbl
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data files (too large)
+warehouse_report/mc_samples.csv
+
+# Keep the visualizations and smaller CSVs
+!warehouse_report/*.png
+!warehouse_report/summary_results.csv
+!warehouse_report/importance_factors.csv
