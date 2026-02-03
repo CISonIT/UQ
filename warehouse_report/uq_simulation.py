@@ -1,18 +1,7 @@
 """
-Warehouse Order Picking - Uncertainty Quantification & Reliability Analysis
+Warehouse UQ Analysis
 
-This script runs a complete UQ analysis on warehouse picking times.
-We're basically trying to figure out: "What's the chance we'll miss our SLA?"
-
-What it does:
-- Runs Monte Carlo simulation (100k samples - takes about 30-60 sec)
-- FOSM method for quick variance estimates
-- FORM analysis to find the "most probable failure point"
-- Sensitivity analysis to see what really matters
-- Generates nice plots for the report
-
-Author: Jakub
-Date: February 2026
+Monte Carlo, FOSM, and FORM analysis for warehouse picking times.
 """
 
 # Check dependencies
@@ -39,125 +28,77 @@ except ImportError as e:
 import warnings
 warnings.filterwarnings('ignore')
 
-# Set random seed for reproducibility
 np.random.seed(42)
-
-# Set plot style
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
-# ============================================================================
-# SECTION 1: MODEL DEFINITION
-# ============================================================================
-
 class WarehousePickingModel:
-    """
-    Warehouse picking time model - pretty straightforward:
-    Total time = (# of items × time per item) + (distance walked × walking speed)
-    
-    Y = N * t_p + D * t_w
-    """
+    """Picking time: Y = N * t_p + D * t_w"""
     
     def __init__(self):
-        # Mean values
-        self.mu_N = 20.0      # Number of order lines
-        self.mu_tp = 30.0     # Picking time per line [s]
-        self.mu_D = 300.0     # Walking distance [m]
-        self.mu_tw = 1.2      # Walking time per unit distance [s/m]
+        self.mu_N = 20.0
+        self.mu_tp = 30.0
+        self.mu_D = 300.0
+        self.mu_tw = 1.2
         
-        # Coefficients of variation
         self.cov_N = 0.20
         self.cov_tp = 0.15
         self.cov_D = 0.10
         self.cov_tw = 0.10
         
-        # Standard deviations
         self.sigma_N = self.cov_N * self.mu_N
         self.sigma_tp = self.cov_tp * self.mu_tp
         self.sigma_D = self.cov_D * self.mu_D
         self.sigma_tw = self.cov_tw * self.mu_tw
         
-        # SLA threshold
-        self.T_SLA = 1200.0  # [s]
+        self.T_SLA = 1200.0
         
-        # Distribution types
-        self.dist_N = 'normal'      # Poisson approximated by Normal
+        self.dist_N = 'normal'
         self.dist_tp = 'lognormal'
         self.dist_D = 'normal'
         self.dist_tw = 'lognormal'
     
     def evaluate(self, N, tp, D, tw):
-        """Evaluate picking time model"""
         return N * tp + D * tw
     
     def gradient(self, N, tp, D, tw):
-        """Analytical gradient of the model"""
-        dM_dN = tp
-        dM_dtp = N
-        dM_dD = tw
-        dM_dtw = D
-        return np.array([dM_dN, dM_dtp, dM_dD, dM_dtw])
+        return np.array([tp, N, tw, D])
     
     def limit_state_function(self, N, tp, D, tw):
-        """Limit state function: g(X) = T_SLA - T_pick"""
         return self.T_SLA - self.evaluate(N, tp, D, tw)
 
-# ============================================================================
-# SECTION 2: RANDOM VARIABLE GENERATION
-# ============================================================================
-
 def generate_lognormal_params(mean, std):
-    """
-    Convert desired mean and std to lognormal parameters
-    """
     variance = std**2
     mu_ln = np.log(mean**2 / np.sqrt(variance + mean**2))
     sigma_ln = np.sqrt(np.log(1 + variance / mean**2))
     return mu_ln, sigma_ln
 
 def generate_samples(model, n_samples):
-    """
-    Generate samples from input distributions
-    """
-    # N: Normal (Poisson approximation)
     N_samples = np.random.normal(model.mu_N, model.sigma_N, n_samples)
-    N_samples = np.maximum(N_samples, 1)  # Ensure positive
+    N_samples = np.maximum(N_samples, 1)
     
-    # tp: Lognormal
     mu_ln_tp, sigma_ln_tp = generate_lognormal_params(model.mu_tp, model.sigma_tp)
     tp_samples = np.random.lognormal(mu_ln_tp, sigma_ln_tp, n_samples)
     
-    # D: Normal
     D_samples = np.random.normal(model.mu_D, model.sigma_D, n_samples)
-    D_samples = np.maximum(D_samples, 0)  # Ensure non-negative
+    D_samples = np.maximum(D_samples, 0)
     
-    # tw: Lognormal
     mu_ln_tw, sigma_ln_tw = generate_lognormal_params(model.mu_tw, model.sigma_tw)
     tw_samples = np.random.lognormal(mu_ln_tw, sigma_ln_tw, n_samples)
     
     return N_samples, tp_samples, D_samples, tw_samples
 
-# ============================================================================
-# SECTION 3: BENCHMARK VERIFICATION
-# ============================================================================
-
 def benchmark_verification(n_samples=100000):
-    """
-    Verify implementation with Y = X^2, X ~ N(10, 2)
-    Analytical: E[Y] = 104, Var(Y) = 1632
-    """
     print("\n" + "="*70)
     print("BENCHMARK VERIFICATION")
     print("="*70)
     
-    # Analytical solution
     mu_X = 10.0
     sigma_X = 2.0
     E_Y_analytical = mu_X**2 + sigma_X**2
     E_Y2_analytical = mu_X**4 + 6*mu_X**2*sigma_X**2 + 3*sigma_X**4
     Var_Y_analytical = E_Y2_analytical - E_Y_analytical**2
     
-    # Monte Carlo
     X_samples = np.random.normal(mu_X, sigma_X, n_samples)
     Y_samples = X_samples**2
     E_Y_mc = np.mean(Y_samples)
@@ -175,29 +116,17 @@ def benchmark_verification(n_samples=100000):
     
     return True
 
-# ============================================================================
-# SECTION 4: FOSM METHOD
-# ============================================================================
-
 def fosm_analysis(model):
-    """
-    First-Order Second-Moment (FOSM) Method
-    """
     print("\n" + "="*70)
     print("FIRST-ORDER SECOND-MOMENT (FOSM) METHOD")
     print("="*70)
     
-    # Mean value
     mu_Y = model.evaluate(model.mu_N, model.mu_tp, model.mu_D, model.mu_tw)
-    
-    # Gradient at mean
     grad = model.gradient(model.mu_N, model.mu_tp, model.mu_D, model.mu_tw)
     
-    # Covariance matrix (diagonal - independence assumption)
     Sigma_X = np.diag([model.sigma_N**2, model.sigma_tp**2, 
                        model.sigma_D**2, model.sigma_tw**2])
     
-    # Variance approximation: Var(Y) ≈ grad^T * Sigma_X * grad
     var_Y = grad.T @ Sigma_X @ grad
     sigma_Y = np.sqrt(var_Y)
     
@@ -221,36 +150,22 @@ def fosm_analysis(model):
     
     return mu_Y, sigma_Y, var_Y, grad
 
-# ============================================================================
-# SECTION 5: MONTE CARLO SIMULATION
-# ============================================================================
-
 def monte_carlo_simulation(model, n_samples=100000):
-    """
-    Monte Carlo Simulation for Uncertainty Propagation
-    """
     print("\n" + "="*70)
     print("MONTE CARLO SIMULATION")
     print("="*70)
     
     print(f"\nGenerating {n_samples:,} samples...")
     
-    # Generate samples
     N_samples, tp_samples, D_samples, tw_samples = generate_samples(model, n_samples)
-    
-    # Evaluate model
     Y_samples = model.evaluate(N_samples, tp_samples, D_samples, tw_samples)
     
-    # Statistics
     mu_Y = np.mean(Y_samples)
     sigma_Y = np.std(Y_samples, ddof=1)
     var_Y = np.var(Y_samples, ddof=1)
     
-    # Confidence interval for mean
     se_mu = sigma_Y / np.sqrt(n_samples)
     ci_95_mu = (mu_Y - 1.96*se_mu, mu_Y + 1.96*se_mu)
-    
-    # Percentiles
     percentiles = np.percentile(Y_samples, [5, 25, 50, 75, 95])
     
     print(f"\nMonte Carlo Results:")
@@ -266,12 +181,10 @@ def monte_carlo_simulation(model, n_samples=100000):
     print(f"    75th: {percentiles[3]:.2f} s ({percentiles[3]/60:.2f} min)")
     print(f"    95th: {percentiles[4]:.2f} s ({percentiles[4]/60:.2f} min)")
     
-    # Failure probability
     g_samples = model.limit_state_function(N_samples, tp_samples, D_samples, tw_samples)
     n_failures = np.sum(g_samples <= 0)
     P_f = n_failures / n_samples
     
-    # Confidence interval for P_f
     se_Pf = np.sqrt(P_f * (1 - P_f) / n_samples)
     ci_95_Pf = (P_f - 1.96*se_Pf, P_f + 1.96*se_Pf)
     
@@ -281,7 +194,6 @@ def monte_carlo_simulation(model, n_samples=100000):
     print(f"  P_f:           {P_f:.5f} ({P_f*100:.3f}%)")
     print(f"  95% CI for P_f: [{ci_95_Pf[0]:.5f}, {ci_95_Pf[1]:.5f}]")
     
-    # Reliability index (approximation)
     beta_mc = -stats.norm.ppf(P_f)
     print(f"  β (MC approx): {beta_mc:.3f}")
     
@@ -327,14 +239,10 @@ def transform_from_standard_normal(u, mu, sigma, dist_type):
         return mu + sigma * u
 
 def form_analysis(model, max_iter=50, tol=1e-6):
-    """
-    First-Order Reliability Method (FORM)
-    """
     print("\n" + "="*70)
     print("FIRST-ORDER RELIABILITY METHOD (FORM)")
     print("="*70)
     
-    # Initial guess in standard normal space (at mean, u = 0)
     u = np.array([0.0, 0.0, 0.0, 0.0])
     
     means = np.array([model.mu_N, model.mu_tp, model.mu_D, model.mu_tw])
@@ -346,24 +254,19 @@ def form_analysis(model, max_iter=50, tol=1e-6):
     print("-" * 50)
     
     for iteration in range(max_iter):
-        # Transform to physical space
         x = np.array([transform_from_standard_normal(u[i], means[i], sigmas[i], dist_types[i]) 
                       for i in range(4)])
         
-        # Evaluate limit state function
         g_u = model.limit_state_function(x[0], x[1], x[2], x[3])
+        grad_x = -model.gradient(x[0], x[1], x[2], x[3])
         
-        # Compute gradient in physical space
-        grad_x = -model.gradient(x[0], x[1], x[2], x[3])  # Negative because g = T_SLA - T_pick
-        
-        # Transform gradient to standard normal space
         grad_u = np.zeros(4)
         for i in range(4):
             if dist_types[i] == 'lognormal':
                 mu_ln, sigma_ln = generate_lognormal_params(means[i], sigmas[i])
-                grad_u[i] = grad_x[i] * x[i] * sigma_ln  # Chain rule for lognormal
+                grad_u[i] = grad_x[i] * x[i] * sigma_ln
             else:
-                grad_u[i] = grad_x[i] * sigmas[i]  # Chain rule for normal
+                grad_u[i] = grad_x[i] * sigmas[i]
         
         grad_u_norm = np.linalg.norm(grad_u)
         
@@ -371,16 +274,9 @@ def form_analysis(model, max_iter=50, tol=1e-6):
             print(f"Warning: Gradient norm too small at iteration {iteration}")
             break
         
-        # Direction vector
         alpha = grad_u / grad_u_norm
-        
-        # Current reliability index
         beta = np.linalg.norm(u)
-        
-        # Update u using HLRF algorithm
         u_new = (np.dot(grad_u, u) - g_u) / grad_u_norm * alpha
-        
-        # Convergence check
         delta_u = np.linalg.norm(u_new - u)
         
         if iteration % 5 == 0 or iteration < 5:
@@ -393,17 +289,13 @@ def form_analysis(model, max_iter=50, tol=1e-6):
         
         u = u_new
     
-    # Final results
     beta = np.linalg.norm(u)
     x_star = np.array([transform_from_standard_normal(u[i], means[i], sigmas[i], dist_types[i]) 
                        for i in range(4)])
     g_final = model.limit_state_function(x_star[0], x_star[1], x_star[2], x_star[3])
     
-    # Importance factors
     alpha = u / beta
     alpha_squared = alpha**2
-    
-    # Failure probability
     P_f_form = stats.norm.cdf(-beta)
     
     print(f"\nFORM Results:")
@@ -440,22 +332,13 @@ def form_analysis(model, max_iter=50, tol=1e-6):
     
     return results
 
-# ============================================================================
-# SECTION 7: VISUALIZATION
-# ============================================================================
-
 def create_visualizations(model, mc_results, form_results, fosm_results):
-    """
-    Create comprehensive visualization suite
-    """
     print("\n" + "="*70)
     print("GENERATING VISUALIZATIONS")
     print("="*70)
     
-    # Create figure with subplots
     fig = plt.figure(figsize=(16, 12))
     
-    # ========== Plot 1: Input Distributions ==========
     ax1 = plt.subplot(3, 3, 1)
     ax1.hist(mc_results['N_samples'], bins=50, density=True, alpha=0.7, 
              color='steelblue', edgecolor='black')
@@ -469,7 +352,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
-    # ========== Plot 2: tp Distribution ==========
     ax2 = plt.subplot(3, 3, 2)
     ax2.hist(mc_results['tp_samples'], bins=50, density=True, alpha=0.7, 
              color='coral', edgecolor='black')
@@ -484,12 +366,10 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
-    # ========== Plot 3: Output Distribution ==========
     ax3 = plt.subplot(3, 3, 3)
     ax3.hist(mc_results['Y_samples'], bins=100, density=True, alpha=0.7, 
              color='mediumseagreen', edgecolor='black', label='MC Simulation')
     
-    # FOSM normal approximation
     x_Y = np.linspace(mc_results['Y_samples'].min(), mc_results['Y_samples'].max(), 200)
     ax3.plot(x_Y, stats.norm.pdf(x_Y, fosm_results[0], fosm_results[1]), 
              'b--', linewidth=2, label='FOSM (Normal)')
@@ -502,7 +382,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     ax3.legend(fontsize=8)
     ax3.grid(True, alpha=0.3)
     
-    # ========== Plot 4: Cumulative Distribution ==========
     ax4 = plt.subplot(3, 3, 4)
     Y_sorted = np.sort(mc_results['Y_samples'])
     cdf = np.arange(1, len(Y_sorted) + 1) / len(Y_sorted)
@@ -542,13 +421,11 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     ax6.set_title('(f) FORM Importance Factors (α²)', fontsize=11, fontweight='bold')
     ax6.grid(True, alpha=0.3, axis='y')
     
-    # Add value labels on bars
     for bar, val in zip(bars, alpha_sq * 100):
         height = bar.get_height()
         ax6.text(bar.get_x() + bar.get_width()/2., height,
                 f'{val:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
     
-    # ========== Plot 7: Convergence of MC ==========
     ax7 = plt.subplot(3, 3, 7)
     n_points = 50
     sample_sizes = np.logspace(2, np.log10(len(mc_results['Y_samples'])), n_points).astype(int)
@@ -568,7 +445,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     ax7.legend()
     ax7.grid(True, alpha=0.3)
     
-    # ========== Plot 8: Reliability Comparison ==========
     ax8 = plt.subplot(3, 3, 8)
     methods = ['Monte Carlo', 'FORM']
     P_f_values = [mc_results['P_f'] * 100, form_results['P_f_form'] * 100]
@@ -590,7 +466,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     ax8_twin.tick_params(axis='y', labelcolor='steelblue')
     ax8.grid(True, alpha=0.3, axis='y')
     
-    # Add value labels
     for bar, val in zip(bars1, P_f_values):
         height = bar.get_height()
         ax8.text(bar.get_x() + bar.get_width()/2., height,
@@ -600,7 +475,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
         ax8_twin.text(bar.get_x() + bar.get_width()/2., height,
                      f'{val:.3f}', ha='center', va='bottom', fontsize=9)
     
-    # ========== Plot 9: Box Plot Comparison ==========
     ax9 = plt.subplot(3, 3, 9)
     data_box = [mc_results['N_samples'], mc_results['tp_samples'], 
                 mc_results['D_samples'], mc_results['tw_samples']]
@@ -613,7 +487,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
         patch.set_facecolor(color)
         patch.set_alpha(0.7)
     
-    # Mark means
     for i, mean in enumerate(means_box):
         ax9.plot(i+1, mean, 'r*', markersize=15, label='Mean' if i==0 else '')
     
@@ -626,14 +499,12 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     plt.savefig('warehouse_uq_analysis.png', dpi=300, bbox_inches='tight')
     print(f"✓ Main visualization saved: warehouse_uq_analysis.png")
     
-    # ========== Additional Visualization: Tornado Diagram ==========
     fig_tornado, ax_tornado = plt.subplots(figsize=(10, 6))
     
     variables_labels = ['N (Order Lines)', 'tp (Picking Time)', 'D (Walking Distance)', 'tw (Walking Speed)']
     alpha_values = form_results['alpha']
     alpha_sq_values = form_results['alpha_squared']
     
-    # Sort by importance
     sorted_idx = np.argsort(alpha_sq_values)
     sorted_labels = [variables_labels[i] for i in sorted_idx]
     sorted_values = alpha_sq_values[sorted_idx] * 100
@@ -648,7 +519,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     ax_tornado.set_title('Sensitivity Analysis: FORM Importance Factors', fontsize=14, fontweight='bold')
     ax_tornado.grid(True, alpha=0.3, axis='x')
     
-    # Add value labels
     for i, (bar, val) in enumerate(zip(bars_tornado, sorted_values)):
         width = bar.get_width()
         ax_tornado.text(width + 1, bar.get_y() + bar.get_height()/2, 
@@ -658,10 +528,8 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     plt.savefig('tornado_diagram.png', dpi=300, bbox_inches='tight')
     print(f"✓ Tornado diagram saved: tornado_diagram.png")
     
-    # ========== Additional Plot: PDF Comparison ==========
     fig_pdf, (ax_pdf1, ax_pdf2) = plt.subplots(1, 2, figsize=(14, 5))
     
-    # Left: Output distribution with normal fit
     ax_pdf1.hist(mc_results['Y_samples'], bins=80, density=True, alpha=0.6, 
                  color='steelblue', edgecolor='black', label='MC Simulation')
     
@@ -682,7 +550,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     ax_pdf1.legend(fontsize=9, loc='upper right')
     ax_pdf1.grid(True, alpha=0.3)
     
-    # Right: Reliability index visualization
     methods = ['FOSM', 'Monte Carlo', 'FORM']
     beta_comparison = [1.77, mc_results['beta_mc'], form_results['beta']]
     pf_comparison = [stats.norm.cdf(-1.77)*100, mc_results['P_f']*100, form_results['P_f_form']*100]
@@ -706,7 +573,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     ax_pdf2_twin.tick_params(axis='y', labelcolor='#FF6B6B')
     ax_pdf2.grid(True, alpha=0.3, axis='y')
     
-    # Add value labels
     for bar, val in zip(bars1_pdf2, beta_comparison):
         height = bar.get_height()
         ax_pdf2.text(bar.get_x() + bar.get_width()/2, height,
@@ -723,17 +589,14 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     plt.savefig('distribution_comparison.png', dpi=300, bbox_inches='tight')
     print(f"✓ Distribution comparison saved: distribution_comparison.png")
     
-    # ========== Additional Plot: Standard Normal Space ==========
     fig2, ax = plt.subplots(figsize=(10, 8))
     
-    # Plot origin and MPP
     ax.plot(0, 0, 'go', markersize=15, label='Origin (Mean)', zorder=5)
     ax.plot(form_results['u_star'][0], form_results['u_star'][1], 
             'r*', markersize=20, label='MPP (u*)', zorder=5)
     ax.plot([0, form_results['u_star'][0]], [0, form_results['u_star'][1]], 
             'b--', linewidth=2, label=f'β = {form_results["beta"]:.3f}')
     
-    # Draw circles for constant probability
     theta = np.linspace(0, 2*np.pi, 100)
     for radius in [1, 2, 3]:
         x_circle = radius * np.cos(theta)
@@ -741,12 +604,10 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
         ax.plot(x_circle, y_circle, 'k:', alpha=0.3, linewidth=1)
         ax.text(radius, 0.1, f'β={radius}', fontsize=9, alpha=0.5)
     
-    # Draw failure surface (approximate)
     u1_range = np.linspace(-3, 3, 50)
     u2_range = np.linspace(-3, 3, 50)
     U1, U2 = np.meshgrid(u1_range, u2_range)
     
-    # Transform to physical space and evaluate limit state
     G = np.zeros_like(U1)
     for i in range(len(u1_range)):
         for j in range(len(u2_range)):
@@ -757,7 +618,6 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     contour = ax.contour(U1, U2, G, levels=[0], colors='red', linewidths=2.5)
     ax.clabel(contour, inline=True, fontsize=10, fmt='g=0')
     
-    # Shade failure region
     ax.contourf(U1, U2, G, levels=[-1000, 0], colors='red', alpha=0.2)
     ax.text(1.5, -2, 'Failure\nRegion', fontsize=12, color='red', fontweight='bold')
     
@@ -777,14 +637,7 @@ def create_visualizations(model, mc_results, form_results, fosm_results):
     plt.close('all')
     print(f"\n✓ All visualizations generated successfully\n")
 
-# ============================================================================
-# SECTION 8: RESULTS SUMMARY AND EXPORT
-# ============================================================================
-
 def generate_summary_report(model, mc_results, form_results, fosm_results):
-    """
-    Generate comprehensive summary report
-    """
     print("\n" + "="*70)
     print("SUMMARY REPORT")
     print("="*70)
@@ -801,11 +654,9 @@ def generate_summary_report(model, mc_results, form_results, fosm_results):
     df_summary = pd.DataFrame(summary)
     print("\n" + df_summary.to_string(index=False))
     
-    # Save to CSV
     df_summary.to_csv('summary_results.csv', index=False)
     print(f"\n✓ Summary saved to: summary_results.csv")
     
-    # Detailed importance factors
     importance_df = pd.DataFrame({
         'Variable': ['N (Order Lines)', 'tp (Picking Time)', 'D (Distance)', 'tw (Walking Time)'],
         'α': form_results['alpha'],
@@ -821,7 +672,6 @@ def generate_summary_report(model, mc_results, form_results, fosm_results):
     importance_df.to_csv('importance_factors.csv', index=False)
     print(f"\n✓ Importance factors saved to: importance_factors.csv")
     
-    # Save MC samples for further analysis
     mc_data = pd.DataFrame({
         'N': mc_results['N_samples'],
         'tp': mc_results['tp_samples'],
@@ -833,14 +683,7 @@ def generate_summary_report(model, mc_results, form_results, fosm_results):
     mc_data.to_csv('mc_samples.csv', index=False)
     print(f"✓ MC samples saved to: mc_samples.csv (100,000 rows)")
 
-# ============================================================================
-# MAIN EXECUTION
-# ============================================================================
-
 def main():
-    """
-    Main execution function
-    """
     print("\n" + "="*70)
     print(" " * 10 + "WAREHOUSE ORDER PICKING UQ ANALYSIS")
     print("="*70)
@@ -849,25 +692,13 @@ def main():
     print("Date: 2026-02-01")
     print("="*70)
     
-    # Initialize model
     model = WarehousePickingModel()
     
-    # Step 1: Benchmark verification
     benchmark_verification()
-    
-    # Step 2: FOSM Analysis
     fosm_results = fosm_analysis(model)
-    
-    # Step 3: Monte Carlo Simulation
     mc_results = monte_carlo_simulation(model, n_samples=100000)
-    
-    # Step 4: FORM Analysis
     form_results = form_analysis(model)
-    
-    # Step 5: Generate Visualizations
     create_visualizations(model, mc_results, form_results, fosm_results)
-    
-    # Step 6: Generate Summary Report
     generate_summary_report(model, mc_results, form_results, fosm_results)
     
     print("\n" + "="*70)
